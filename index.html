@@ -1,60 +1,143 @@
-// 기존의 move 함수들을 아래와 같이 수정하면 정확하게 작동합니다.
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지구계 2048 - 최종 수정본</title>
+<style>
+body{ margin:0; font-family:'Arial',sans-serif; background:#faf8ef; text-align:center; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+h1{ margin-top:0; color:#776e65; font-size:48px; }
+#topbar{ display:flex; justify-content:center; gap:10px; margin-bottom:10px; }
+.info{ background:#bbada0; padding:10px 20px; border-radius:6px; color:white; font-weight:bold; }
+.info span { display:block; font-size:20px; }
+#board{ width:400px; height:400px; background:#bbada0; padding:10px; border-radius:10px; box-sizing:border-box; }
+#game{ width:100%; height:100%; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.cell{ border-radius:6px; display:flex; flex-direction:column; justify-content:center; align-items:center; font-weight:bold; color:#776e65; transition:all .15s ease; background:rgba(238, 228, 218, 0.35); }
+.emoji{ font-size:24px; }
+.name{ font-size:12px; margin-top:4px; }
+#message-overlay{ position:fixed; inset:0; display:none; flex-direction:column; justify-content:center; align-items:center; background:rgba(238, 228, 218, 0.73); z-index:10; font-size:30px; font-weight:bold; color:#776e65; }
+button{ margin-top:20px; border:none; background:#8f7a66; color:white; padding:10px 20px; border-radius:5px; font-size:18px; cursor:pointer; font-weight:bold; }
+#combo-view{ position:fixed; top:100px; font-size:40px; color:#f65e3b; font-weight:bold; opacity:0; pointer-events:none; }
+.show-combo{ animation: combo-up 0.8s ease-out; }
+@keyframes combo-up { 0% { opacity:1; transform:translateY(0); } 100% { opacity:0; transform:translateY(-50px); } }
+</style>
+</head>
+<body>
+<h1>2048</h1>
+<div id="topbar">
+  <div class="info">SCORE<span id="score">0</span></div>
+  <div class="info">BEST STEP<span id="best">광물</span></div>
+</div>
+<div id="combo-view"></div>
+<div id="board"><div id="game"></div></div>
+<div id="message-overlay">
+  <div id="msg-text"></div>
+  <button onclick="restart()">Try Again</button>
+</div>
+<button onclick="restart()">New Game</button>
 
+<script>
+const levels = [
+ {name:"광물",emoji:"💎",color:"#eee4da"}, {name:"암석",emoji:"🪨",color:"#ede0c8"},
+ {name:"지각",emoji:"🌄",color:"#f2b179"}, {name:"맨틀",emoji:"🔥",color:"#f59563"},
+ {name:"외핵",emoji:"🌋",color:"#f67c5f"}, {name:"내핵",emoji:"☀️",color:"#f65e3b"},
+ {name:"지권",emoji:"🌍",color:"#edcf72"}, {name:"수권",emoji:"💧",color:"#edcc61"},
+ {name:"기권",emoji:"☁️",color:"#9ad3bc"}, {name:"생물권",emoji:"🌱",color:"#7cb342"},
+ {name:"외권",emoji:"🛰️",color:"#b39ddb"}, {name:"지구계",emoji:"🌎",color:"#4db6ac"}
+];
+let grid, score, comboCount;
+function restart(){
+  grid = Array(4).fill().map(()=>Array(4).fill(null));
+  score = 0; comboCount = 0;
+  document.getElementById("message-overlay").style.display="none";
+  randomCell(); randomCell(); update();
+}
+function randomCell(){
+  let empty=[];
+  grid.forEach((r,i)=>r.forEach((c,j)=>{ if(!c) empty.push({i,j}); }));
+  if(empty.length){
+    let p = empty[Math.floor(Math.random()*empty.length)];
+    grid[p.i][p.j] = { value:"광물", anim:"spawn" };
+  }
+}
+function update(){
+  const game=document.getElementById("game"); game.innerHTML="";
+  let bestStep="광물";
+  grid.flat().forEach(cell=>{
+    const div=document.createElement("div"); div.className="cell";
+    if(cell){
+      let obj=levels.find(x=>x.name===cell.value);
+      div.style.background=obj.color;
+      div.innerHTML=`<div class="emoji">${obj.emoji}</div><div class="name">${obj.name}</div>`;
+      bestStep = obj.name;
+    }
+    game.appendChild(div);
+  });
+  document.getElementById("score").textContent=score;
+  document.getElementById("best").textContent=bestStep;
+  if(bestStep==="지구계") showEnd("🎉 지구계 완성!");
+}
+function showEnd(t){ document.getElementById("msg-text").textContent=t; document.getElementById("message-overlay").style.display="flex"; }
+function slide(row){
+  let arr=row.filter(v=>v);
+  for(let i=0;i<arr.length-1;i++){
+    let idx=levels.findIndex(l=>l.name===arr[i].value);
+    if(arr[i].value===arr[i+1].value && idx<levels.length-1){
+      arr[i]={ value:levels[idx+1].name, anim:"merge" };
+      arr.splice(i+1,1); comboCount++; score += (idx+1)*20;
+    }
+  }
+  while(arr.length<4) arr.push(null);
+  return arr;
+}
+function rotate(){
+  let newGrid=Array(4).fill().map(()=>Array(4).fill(null));
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++) newGrid[j][3-i]=grid[i][j];
+  grid=newGrid;
+}
 function moveLeft() {
-  comboCount = 0;
-  let before = JSON.stringify(grid);
+  comboCount = 0; let before = JSON.stringify(grid);
   grid = grid.map(r => slide(r));
-  if (before !== JSON.stringify(grid)) {
-    randomCell();
-    showCombo();
-    update();
-    checkGameOver();
-  }
+  if (before !== JSON.stringify(grid)) finalizeMove();
 }
-
 function moveRight() {
-  let before = JSON.stringify(grid);
-  grid = grid.map(r => slide([...r].reverse()).reverse()); // 좌우 반전 후 슬라이드
-  if (before !== JSON.stringify(grid)) {
-    randomCell();
-    showCombo();
-    update();
-    checkGameOver();
-  }
+  comboCount = 0; let before = JSON.stringify(grid);
+  grid = grid.map(r => slide([...r].reverse()).reverse());
+  if (before !== JSON.stringify(grid)) finalizeMove();
 }
-
 function moveUp() {
-  let before = JSON.stringify(grid);
-  rotate(); // 90도 회전
-  rotate();
-  rotate(); // 결과적으로 270도 회전 (위쪽이 왼쪽으로 오게 함)
-  
+  comboCount = 0; let before = JSON.stringify(grid);
+  rotate(); rotate(); rotate();
   grid = grid.map(r => slide(r));
-  
-  rotate(); // 90도 회전하여 원상복구
-  
-  if (before !== JSON.stringify(grid)) {
-    randomCell();
-    showCombo();
-    update();
-    checkGameOver();
-  }
+  rotate();
+  if (before !== JSON.stringify(grid)) finalizeMove();
 }
-
 function moveDown() {
-  let before = JSON.stringify(grid);
-  rotate(); // 90도 회전 (아래쪽이 왼쪽으로 오게 함)
-  
+  comboCount = 0; let before = JSON.stringify(grid);
+  rotate();
   grid = grid.map(r => slide(r));
-  
-  rotate();
-  rotate();
-  rotate(); // 270도 회전하여 원상복구
-  
-  if (before !== JSON.stringify(grid)) {
-    randomCell();
-    showCombo();
-    update();
-    checkGameOver();
+  rotate(); rotate(); rotate();
+  if (before !== JSON.stringify(grid)) finalizeMove();
+}
+function finalizeMove(){
+  randomCell(); update(); checkGameOver();
+  if(comboCount > 1) {
+    const cv = document.getElementById("combo-view");
+    cv.textContent = comboCount + " COMBO!";
+    cv.classList.remove("show-combo"); void cv.offsetWidth; cv.classList.add("show-combo");
   }
 }
+function checkGameOver(){
+  if(grid.flat().includes(null)) return;
+  for(let i=0;i<4;i++) for(let j=0;j<3;j++)
+    if(grid[i][j].value===grid[i][j+1].value || grid[j][i].value===grid[j+1][i].value) return;
+  showEnd("💥 게임 오버");
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") moveLeft(); if(e.key==="ArrowRight") moveRight();
+  if(e.key==="ArrowUp") moveUp(); if(e.key==="ArrowDown") moveDown();
+});
+restart();
+</script>
+</body>
+</html>
