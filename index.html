@@ -1,135 +1,60 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<title>지구계 2048</title>
-<style>
-  body { font-family: sans-serif; text-align: center; background: #faf8ef; }
-  h1 { margin-top: 20px; }
-  #game { 
-    width: 400px; 
-    height: 400px; 
-    margin: 20px auto; 
-    display: grid; 
-    grid-template-columns: repeat(4, 1fr); 
-    gap: 10px; 
-  }
-  .cell {
-    width: 90px;
-    height: 90px;
-    background: #cdc1b4;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 14px;
-    border-radius: 5px;
-    padding: 5px;
-  }
-</style>
-</head>
-<body>
-
-<h1>🌍 지구계 2048</h1>
-<p>방향키로 이동하세요</p>
-
-<div id="game"></div>
-
-<script>
-const levels = [
-  "광물","암석","지각","맨틀","외핵","내핵",
-  "지권","수권","기권","생물권","외권","지구계"
-];
-
-let grid = Array(4).fill().map(() => Array(4).fill(null));
-
-function draw() {
-  const game = document.getElementById("game");
-  game.innerHTML = "";
-  grid.forEach(row => {
-    row.forEach(cell => {
-      const div = document.createElement("div");
-      div.className = "cell";
-      div.textContent = cell ? cell : "";
-      game.appendChild(div);
-    });
-  });
-}
-
-function randomCell() {
-  let empty = [];
-  grid.forEach((row, i) => {
-    row.forEach((cell, j) => {
-      if (!cell) empty.push({i,j});
-    });
-  });
-  if (empty.length === 0) return;
-  let {i,j} = empty[Math.floor(Math.random()*empty.length)];
-  grid[i][j] = "광물";
-}
-
-function slide(row) {
-  let arr = row.filter(v => v);
-  for (let i=0; i<arr.length-1; i++) {
-    let idx = levels.indexOf(arr[i]);
-    if (arr[i] === arr[i+1] && idx < levels.length-1) {
-      arr[i] = levels[idx+1];
-      arr.splice(i+1,1);
-    }
-  }
-  while (arr.length < 4) arr.push(null);
-  return arr;
-}
-
-function rotate() {
-  let newGrid = Array(4).fill().map(()=>Array(4).fill(null));
-  for (let i=0;i<4;i++){
-    for (let j=0;j<4;j++){
-      newGrid[j][3-i] = grid[i][j];
-    }
-  }
-  grid = newGrid;
-}
+// 기존의 move 함수들을 아래와 같이 수정하면 정확하게 작동합니다.
 
 function moveLeft() {
-  let changed = false;
-  grid = grid.map(row => {
-    let newRow = slide(row);
-    if (JSON.stringify(row) !== JSON.stringify(newRow)) changed = true;
-    return newRow;
-  });
-  if (changed) randomCell();
+  comboCount = 0;
+  let before = JSON.stringify(grid);
+  grid = grid.map(r => slide(r));
+  if (before !== JSON.stringify(grid)) {
+    randomCell();
+    showCombo();
+    update();
+    checkGameOver();
+  }
 }
 
 function moveRight() {
-  grid = grid.map(row => row.reverse());
-  moveLeft();
-  grid = grid.map(row => row.reverse());
+  let before = JSON.stringify(grid);
+  grid = grid.map(r => slide([...r].reverse()).reverse()); // 좌우 반전 후 슬라이드
+  if (before !== JSON.stringify(grid)) {
+    randomCell();
+    showCombo();
+    update();
+    checkGameOver();
+  }
 }
 
 function moveUp() {
-  rotate(); rotate(); rotate();
-  moveLeft();
+  let before = JSON.stringify(grid);
+  rotate(); // 90도 회전
   rotate();
+  rotate(); // 결과적으로 270도 회전 (위쪽이 왼쪽으로 오게 함)
+  
+  grid = grid.map(r => slide(r));
+  
+  rotate(); // 90도 회전하여 원상복구
+  
+  if (before !== JSON.stringify(grid)) {
+    randomCell();
+    showCombo();
+    update();
+    checkGameOver();
+  }
 }
 
 function moveDown() {
+  let before = JSON.stringify(grid);
+  rotate(); // 90도 회전 (아래쪽이 왼쪽으로 오게 함)
+  
+  grid = grid.map(r => slide(r));
+  
   rotate();
-  moveLeft();
-  rotate(); rotate(); rotate();
+  rotate();
+  rotate(); // 270도 회전하여 원상복구
+  
+  if (before !== JSON.stringify(grid)) {
+    randomCell();
+    showCombo();
+    update();
+    checkGameOver();
+  }
 }
-
-document.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft") moveLeft();
-  if (e.key === "ArrowRight") moveRight();
-  if (e.key === "ArrowUp") moveUp();
-  if (e.key === "ArrowDown") moveDown();
-  draw();
-});
-
-randomCell();
-randomCell();
-draw();
-</script>
-
-</body>
-</html>
